@@ -113,7 +113,10 @@ public class TcpServerTests {
 		SslContext clientOptions = SslContextBuilder.forClient()
 		                                            .trustManager(InsecureTrustManagerFactory.INSTANCE)
 		                                            .build();
-		final TcpServer server = TcpServer.create().host("localhost").secure();
+		final TcpServer server =
+				TcpServer.create()
+				         .host("localhost")
+				         .secureSelfSigned();
 
 		ObjectMapper m = new ObjectMapper();
 

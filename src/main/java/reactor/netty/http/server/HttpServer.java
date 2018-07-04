@@ -16,6 +16,7 @@
 
 package reactor.netty.http.server;
 
+import java.security.cert.CertificateException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -25,9 +26,16 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
+import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import org.reactivestreams.Publisher;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.ConnectionObserver;
@@ -297,10 +305,28 @@ public abstract class HttpServer {
 	 * with a default value of {@code 10} seconds handshake timeout unless
 	 * the environment property {@code reactor.netty.tcp.sslHandshakeTimeout} is set.
 	 *
+	 * Using {@link SelfSignedCertificate} is not recommended in a production.
+	 *
 	 * @return a new {@link HttpServer}
 	 */
-	public final HttpServer secure() {
-		return new HttpServerSecure(this, null);
+	public final HttpServer secureSelfSigned() {
+		SelfSignedCertificate cert = null;
+		try {
+			cert = new SelfSignedCertificate();
+		} catch (CertificateException e) {
+			throw Exceptions.propagate(e);
+		}
+		SslContextBuilder sslContextBuilder =
+				SslContextBuilder.forServer(cert.certificate(), cert.privateKey())
+				                 .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+				                 .applicationProtocolConfig(new ApplicationProtocolConfig(
+				                     ApplicationProtocolConfig.Protocol.ALPN,
+				                     ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+				                     ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+				                     ApplicationProtocolNames.HTTP_2,
+				                     ApplicationProtocolNames.HTTP_1_1));
+		return new HttpServerSecure(this,
+				sslProviderBuilder -> sslProviderBuilder.sslContextBuilder(sslContextBuilder));
 	}
 
 	/**
@@ -314,7 +340,7 @@ public abstract class HttpServer {
 	 * @return a new {@link HttpServer}
 	 */
 	public final HttpServer secure(Consumer<? super SslProvider.SslContextSpec> sslProviderBuilder) {
-		return HttpServerSecure.secure(this, sslProviderBuilder);
+		return new HttpServerSecure(this, sslProviderBuilder);
 	}
 
 	/**

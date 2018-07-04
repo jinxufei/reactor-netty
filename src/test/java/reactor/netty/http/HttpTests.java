@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.Ignore;
@@ -496,7 +497,7 @@ public class HttpTests {
 	public void testHttpToHttp2Ssl() {
 		DisposableServer server =
 				HttpServer.create()
-				          .secure()
+				          .secureSelfSigned()
 				          .handle((req, res) -> res.sendString(Mono.just("Hello")))
 				          .wiretap()
 				          .bindNow();
@@ -504,7 +505,9 @@ public class HttpTests {
 		String response =
 				HttpClient.create()
 				          .port(server.port())
-						  .secure(ssl -> ssl.forClient().sslContext(s -> s.trustManager(InsecureTrustManagerFactory.INSTANCE)))
+				          .secure(ssl -> ssl.sslContextBuilder(
+				                  SslContextBuilder.forClient()
+				                                   .trustManager(InsecureTrustManagerFactory.INSTANCE)))
 				          .wiretap()
 				          .get()
 				          .uri("/")
@@ -522,7 +525,7 @@ public class HttpTests {
 		DisposableServer server =
 				HttpServer.create()
 				          .port(8080)
-				          .secure()
+				          .secureSelfSigned()
 				          .handle((req, res) -> res.sendString(Mono.just("Hello")))
 				          .wiretap()
 				          .bindNow();

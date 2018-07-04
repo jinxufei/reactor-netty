@@ -17,6 +17,7 @@
 package reactor.netty.tcp;
 
 import java.net.SocketAddress;
+import java.security.cert.CertificateException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -33,6 +34,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.util.AttributeKey;
 import io.netty.util.NetUtil;
 import org.reactivestreams.Publisher;
@@ -435,10 +438,20 @@ public abstract class TcpServer {
 	 * to with a default value of {@code 10} seconds handshake timeout unless the
 	 * environment property {@code reactor.netty.tcp.sslHandshakeTimeout} is set.
 	 *
+	 * Using {@link SelfSignedCertificate} is not recommended in a production.
+	 *
 	 * @return a new {@link TcpServer}
 	 */
-	public final TcpServer secure() {
-		return secure(SslProvider.DEFAULT_SERVER_SPEC);
+	public final TcpServer secureSelfSigned() {
+		SelfSignedCertificate cert = null;
+		try {
+			cert = new SelfSignedCertificate();
+		} catch (CertificateException e) {
+			throw Exceptions.propagate(e);
+		}
+		SslContextBuilder sslContextBuilder =
+				SslContextBuilder.forServer(cert.certificate(), cert.privateKey());
+		return secure(sslProviderBuilder -> sslProviderBuilder.sslContextBuilder(sslContextBuilder));
 	}
 
 	/**
